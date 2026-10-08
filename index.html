@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>あたまの体操クイズ</title>
+<style>
+  :root {
+    --bg: #fdf8f0;
+    --card: #ffffff;
+    --ink: #2b2b2b;
+    --sub: #6b6257;
+    --main: #e06a2c;
+    --main-ink: #ffffff;
+    --ok: #2e8b57;
+    --ng: #c0392b;
+    --hint: #2f6fb3;
+    --line: #e6dccd;
+    --box: #fff4e6;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Hiragino Maru Gothic ProN", "BIZ UDPGothic", "Meiryo", sans-serif;
+    font-size: 20px;
+    line-height: 1.6;
+    -webkit-text-size-adjust: 100%;
+  }
+  main { max-width: 560px; margin: 0 auto; padding: 16px 16px 40px; }
+  h1 { font-size: 30px; text-align: center; margin: 24px 0 8px; }
+  .lead { text-align: center; color: var(--sub); margin: 0 0 24px; }
+  .card { background: var(--card); border: 2px solid var(--line); border-radius: 18px; padding: 20px; margin-bottom: 16px; }
+  button {
+    font: inherit; border: none; border-radius: 14px; padding: 16px; width: 100%;
+    cursor: pointer; touch-action: manipulation;
+  }
+  .btn-main { background: var(--main); color: var(--main-ink); font-size: 26px; font-weight: bold; }
+  .btn-hint { background: #e7f0fa; color: var(--hint); font-weight: bold; }
+  .btn-sub { background: #efe8dd; color: var(--ink); }
+  .row > button { font-size: 18px; padding: 14px 6px; white-space: nowrap; }
+  .btn-danger { background: #fbe6e3; color: var(--ng); width: auto; padding: 8px 14px; font-size: 16px; }
+  button:disabled { opacity: .4; cursor: default; }
+  .row { display: flex; gap: 10px; margin-top: 10px; }
+  .row > button { flex: 1; }
+  .stack > * + * { margin-top: 12px; }
+
+  .topbar { display: flex; justify-content: space-between; align-items: center; font-weight: bold; margin-bottom: 12px; }
+  .score { color: var(--main); font-size: 24px; }
+  .chip { display: inline-block; background: #f3e7d6; color: var(--sub); border-radius: 999px; padding: 2px 12px; font-size: 16px; }
+  .question { font-size: 26px; font-weight: bold; margin: 10px 0 4px; }
+  .clue { color: var(--sub); font-size: 18px; margin: 0; }
+  .worth { text-align: right; color: var(--sub); font-size: 18px; margin-top: 8px; }
+  .worth b { color: var(--main); font-size: 24px; }
+
+  .boxes { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 18px 0; }
+  .boxes span {
+    width: 44px; height: 52px; display: flex; align-items: center; justify-content: center;
+    border: 2px solid var(--line); border-radius: 10px; background: var(--box);
+    font-size: 28px; font-weight: bold;
+  }
+  .boxes.long span { width: 36px; height: 44px; font-size: 22px; }
+  .boxes span.open { background: var(--main); color: #fff; border-color: var(--main); }
+  .boxes span.hinted { background: var(--hint); color: #fff; border-color: var(--hint); }
+
+  .answer-line { display: flex; align-items: center; gap: 6px; }
+  .prefix { font-size: 28px; font-weight: bold; color: var(--main); white-space: nowrap; }
+  input[type=text] {
+    flex: 1; min-width: 0; font: inherit; font-size: 26px; padding: 12px;
+    border: 3px solid var(--line); border-radius: 12px; background: #fff;
+  }
+  input[type=text]:focus { outline: none; border-color: var(--main); }
+
+  .msg { min-height: 1.6em; text-align: center; font-weight: bold; font-size: 22px; margin: 12px 0 0; }
+  .msg.ng { color: var(--ng); }
+  .msg.ok { color: var(--ok); }
+  .reveal { text-align: center; font-size: 30px; font-weight: bold; margin: 8px 0; }
+  .shake { animation: shake .35s; }
+  @keyframes shake { 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+
+  .big { font-size: 64px; font-weight: bold; color: var(--main); text-align: center; margin: 0; }
+  .center { text-align: center; }
+  .note { color: var(--sub); font-size: 16px; }
+  ul.list { list-style: none; padding: 0; margin: 0; }
+  ul.list li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  ul.list li:last-child { border-bottom: none; }
+  table.res { width: 100%; border-collapse: collapse; font-size: 17px; }
+  table.res td { padding: 6px 4px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.res td:last-child { text-align: right; white-space: nowrap; font-weight: bold; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+
+  <!-- はじめ -->
+  <section id="home">
+    <h1>あたまの体操クイズ</h1>
+    <p class="lead">さいしょの1文字から<br>のこりを思い出そう！</p>
+    <div class="card stack">
+      <button class="btn-main" id="startBtn">はじめる</button>
+      <p class="center note" id="bestText"></p>
+    </div>
+    <div class="card stack note">
+      <div>・ぜんぶで10問。のこりの文字1つにつき <b>10点</b></div>
+      <div>・ヒントを押すと次の文字が出ます（10点へります）</div>
+      <div>・ひらがなでもカタカナでも大丈夫</div>
+    </div>
+    <div class="card">
+      <div id="familyCount" class="note"></div>
+      <div class="row"><button class="btn-sub" id="manageBtn">家族の問題を見る</button></div>
+    </div>
+  </section>
+
+  <!-- 出題 -->
+  <section id="play" hidden>
+    <div class="topbar">
+      <span id="progress"></span>
+      <span class="score" id="total"></span>
+    </div>
+    <div class="card">
+      <span class="chip" id="cat"></span>
+      <p class="question" id="qText"></p>
+      <p class="clue" id="qClue"></p>
+      <div class="boxes" id="boxes"></div>
+
+      <div id="answerArea">
+        <div class="answer-line">
+          <span class="prefix" id="prefix"></span>
+          <input type="text" id="answer" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="つづきを入力">
+        </div>
+        <p class="msg" id="msg"></p>
+        <button class="btn-main" id="submitBtn">こたえる</button>
+        <div class="row">
+          <button class="btn-hint" id="hintBtn">ヒント −10点</button>
+          <button class="btn-sub" id="giveupBtn">こたえを見る</button>
+        </div>
+        <p class="worth">この問題は <b id="worth"></b> 点</p>
+      </div>
+
+      <div id="doneArea" hidden>
+        <p class="msg" id="doneMsg"></p>
+        <p class="reveal" id="reveal"></p>
+        <button class="btn-main" id="nextBtn">つぎへ</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 結果 -->
+  <section id="result" hidden>
+    <h1>おつかれさまでした！</h1>
+    <div class="card stack">
+      <p class="big"><span id="finalScore"></span><span style="font-size:28px">点</span></p>
+      <p class="center" id="finalNote"></p>
+    </div>
+    <div class="card">
+      <table class="res" id="resTable"></table>
+    </div>
+    <div class="stack">
+      <button class="btn-main" id="againBtn">もういちど</button>
+      <button class="btn-sub" id="homeBtn">はじめの画面へ</button>
+    </div>
+  </section>
+
+  <!-- QRから追加 -->
+  <section id="importView" hidden>
+    <h1>家族の問題がとどきました</h1>
+    <div class="card">
+      <p id="importLead"></p>
+      <ul class="list" id="importList"></ul>
+    </div>
+    <div class="stack">
+      <button class="btn-main" id="importOk">追加する</button>
+      <button class="btn-sub" id="importNo">やめる</button>
+    </div>
+  </section>
+
+  <!-- 家族の問題の一覧 -->
+  <section id="manage" hidden>
+    <h1>家族の問題</h1>
+    <div class="card">
+      <ul class="list" id="familyList"></ul>
+      <p class="note" id="familyEmpty">まだありません。家族に見せてもらったQRコードをスマホのカメラで読むと追加されます。</p>
+    </div>
+    <button class="btn-sub" id="manageBack">もどる</button>
+  </section>
+
+</main>
+
+<script src="common.js"></script>
+<script src="questions.js"></script>
+<script>
+  const QUESTION_COUNT = 10;
+  const FAMILY_PER_GAME = 3;
+  const POINT = 10;
+
+  const $ = id => document.getElementById(id);
+  const views = ['home', 'play', 'result', 'importView', 'manage'];
+  function show(id) {
+    views.forEach(v => { $(v).hidden = v !== id; });
+    window.scrollTo(0, 0);
+  }
+
+  let family = loadJSON(STORE_FAMILY, []);
+  let game = null;
+
+  function shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  // 同じ答えの問題が1回のゲームに2つ出ないようにする
+  function pickQuestions() {
+    const picked = [];
+    const used = new Set();
+    const take = (pool, max) => {
+      for (const q of shuffle(pool)) {
+        if (picked.length >= QUESTION_COUNT || max <= 0) break;
+        if (used.has(q.kana)) continue;
+        used.add(q.kana);
+        picked.push(q);
+        max--;
+      }
+    };
+    take(family, FAMILY_PER_GAME);
+    take(GENERAL_QUESTIONS, QUESTION_COUNT);
+    return shuffle(picked);
+  }
+
+  // ── はじめの画面 ──
+  function renderHome() {
+    const best = loadJSON(STORE_BEST, null);
+    $('bestText').textContent = best != null ? `これまでの最高点：${best}点` : '';
+    $('familyCount').textContent = family.length
+      ? `家族の問題：${family.length}問 入っています（1回に${Math.min(FAMILY_PER_GAME, family.length)}問まで出ます）`
+      : '家族の問題：まだありません';
+    show('home');
+  }
+
+  function startGame() {
+    game = { list: pickQuestions(), index: 0, total: 0, log: [] };
+    renderQuestion();
+    show('play');
+  }
+
+  // ── 出題 ──
+  function current() { return game.list[game.index]; }
+
+  function renderQuestion() {
+    const q = current();
+    game.revealed = 1;
+    game.hints = 0;
+    $('progress').textContent = `${game.index + 1} / ${game.list.length} 問め`;
+    $('total').textContent = `${game.total}点`;
+    $('cat').textContent = q.cat;
+    $('qText').textContent = q.q;
+    $('qClue').textContent = q.hint ? `ヒント：${q.hint}` : '';
+    $('qClue').hidden = !q.hint;
+    $('answer').value = '';
+    $('msg').textContent = '';
+    $('msg').className = 'msg';
+    $('answerArea').hidden = false;
+    $('doneArea').hidden = true;
+    renderBoxes(false);
+    setTimeout(() => $('answer').focus(), 50);
+  }
+
+  function renderBoxes(all) {
+    const q = current();
+    const cs = chars(q.kana);
+    const box = $('boxes');
+    box.innerHTML = '';
+    box.classList.toggle('long', cs.length > 6);
+    cs.forEach((c, i) => {
+      const s = document.createElement('span');
+      if (all || i < game.revealed) {
+        s.textContent = c;
+        s.className = i === 0 ? 'open' : (i < game.revealed ? 'hinted' : 'open');
+      }
+      box.appendChild(s);
+    });
+    $('prefix').textContent = cs.slice(0, game.revealed).join('');
+    $('worth').textContent = worth();
+    $('hintBtn').disabled = game.revealed >= cs.length - 1;
+  }
+
+  function worth() {
+    return (chars(current().kana).length - game.revealed) * POINT;
+  }
+
+  function isCorrect(input) {
+    const q = current();
+    const n = normalizeAnswer(input);
+    if (!n) return false;
+    const prefix = chars(q.kana).slice(0, game.revealed).join('');
+    const answers = [q.kana].concat(q.alt || []).map(normalizeAnswer);
+    return answers.includes(n) || normalizeAnswer(q.kana) === normalizeAnswer(prefix + n);
+  }
+
+  function submit() {
+    if ($('answerArea').hidden) return;
+    const input = $('answer').value;
+    if (!normalizeAnswer(input)) {
+      $('msg').textContent = 'つづきを入力してね';
+      $('msg').className = 'msg ng';
+      return;
+    }
+    if (isCorrect(input)) {
+      finish(worth(), true);
+    } else {
+      $('msg').textContent = 'ちがいます。もういちど！';
+      $('msg').className = 'msg ng';
+      const card = $('answer');
+      card.classList.remove('shake');
+      void card.offsetWidth;
+      card.classList.add('shake');
+      card.select();
+    }
+  }
+
+  function hint() {
+    const len = chars(current().kana).length;
+    if (game.revealed >= len - 1) return;
+    game.revealed++;
+    game.hints++;
+    $('answer').value = '';
+    $('msg').textContent = '';
+    renderBoxes(false);
+    $('answer').focus();
+  }
+
+  function finish(points, ok) {
+    const q = current();
+    game.total += points;
+    game.log.push({ q: q.q, display: q.display, points });
+    $('answerArea').hidden = true;
+    $('doneArea').hidden = false;
+    $('doneMsg').textContent = ok ? `せいかい！ ＋${points}点` : 'こたえは…';
+    $('doneMsg').className = ok ? 'msg ok' : 'msg';
+    $('reveal').textContent = q.display;
+    $('total').textContent = `${game.total}点`;
+    renderBoxes(true);
+    $('nextBtn').textContent = game.index + 1 >= game.list.length ? 'けっかを見る' : 'つぎへ';
+    $('answer').blur();
+    $('nextBtn').focus();
+  }
+
+  function next() {
+    game.index++;
+    if (game.index >= game.list.length) return renderResult();
+    renderQuestion();
+  }
+
+  // ── 結果 ──
+  function renderResult() {
+    const best = loadJSON(STORE_BEST, null);
+    const isBest = best == null || game.total > best;
+    if (isBest) saveJSON(STORE_BEST, game.total);
+    $('finalScore').textContent = game.total;
+    $('finalNote').textContent = isBest ? 'さいこう記録です！' : `これまでの最高点：${best}点`;
+    const t = $('resTable');
+    t.innerHTML = '';
+    game.log.forEach((r, i) => {
+      const tr = document.createElement('tr');
+      [`${i + 1}. ${r.q}`, r.display, `${r.points}点`].forEach(v => {
+        const td = document.createElement('td');
+        td.textContent = v;
+        tr.appendChild(td);
+      });
+      t.appendChild(tr);
+    });
+    show('result');
+  }
+
+  // ── 家族の問題 ──
+  function renderManage() {
+    const ul = $('familyList');
+    ul.innerHTML = '';
+    family.forEach((q, i) => {
+      const li = document.createElement('li');
+      const span = document.createElement('span');
+      span.textContent = q.q;
+      const del = document.createElement('button');
+      del.className = 'btn-danger';
+      del.textContent = 'けす';
+      del.onclick = () => {
+        if (!confirm(`「${q.q}」をけしますか？`)) return;
+        family.splice(i, 1);
+        saveJSON(STORE_FAMILY, family);
+        renderManage();
+      };
+      li.append(span, del);
+      ul.appendChild(li);
+    });
+    $('familyEmpty').hidden = family.length > 0;
+    show('manage');
+  }
+
+  // QRコードで開いたとき（URL の #add=...）
+  function checkImport() {
+    const m = location.hash.match(/^#add=(.+)$/);
+    if (!m) return false;
+    history.replaceState(null, '', location.pathname + location.search);
+    let incoming;
+    try {
+      incoming = decodeFamily(m[1]);
+    } catch (e) {
+      alert('QRコードが読めませんでした。もういちど読みとってください。');
+      return false;
+    }
+    const known = new Set(family.map(q => q.q + '|' + q.kana));
+    const fresh = incoming.filter(q => !known.has(q.q + '|' + q.kana));
+    $('importLead').textContent = fresh.length
+      ? `新しい問題が ${fresh.length}問 あります。追加しますか？`
+      : 'この問題はもう全部入っています。';
+    const ul = $('importList');
+    ul.innerHTML = '';
+    fresh.forEach(q => {
+      const li = document.createElement('li');
+      li.textContent = q.q;
+      ul.appendChild(li);
+    });
+    $('importOk').hidden = !fresh.length;
+    $('importOk').onclick = () => {
+      family = family.concat(fresh);
+      if (!saveJSON(STORE_FAMILY, family)) alert('保存できませんでした。ブラウザの設定を確認してください。');
+      renderHome();
+    };
+    show('importView');
+    return true;
+  }
+
+  $('startBtn').onclick = startGame;
+  $('submitBtn').onclick = submit;
+  $('hintBtn').onclick = hint;
+  $('giveupBtn').onclick = () => finish(0, false);
+  $('nextBtn').onclick = next;
+  $('againBtn').onclick = startGame;
+  $('homeBtn').onclick = renderHome;
+  $('manageBtn').onclick = renderManage;
+  $('manageBack').onclick = renderHome;
+  $('importNo').onclick = renderHome;
+  $('answer').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); submit(); }
+  });
+  window.addEventListener('hashchange', checkImport);
+
+  if (!checkImport()) renderHome();
+</script>
+</body>
+</html>

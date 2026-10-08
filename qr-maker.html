@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>家族の問題QR作成</title>
+<style>
+  :root { --bg: #f6f4f0; --card: #fff; --ink: #222; --sub: #666; --line: #ddd; --main: #e06a2c; --warn: #b3261e; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: "BIZ UDPGothic", "Meiryo", sans-serif; font-size: 16px; line-height: 1.6; }
+  main { max-width: 760px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 24px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  label { display: block; font-size: 13px; color: var(--sub); }
+  input { width: 100%; font: inherit; padding: 8px; border: 1px solid var(--line); border-radius: 8px; }
+  .q { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; margin-top: 12px; }
+  .q .wide { grid-column: 1 / -1; }
+  .q .tools { grid-column: 1 / -1; text-align: right; }
+  button { font: inherit; padding: 10px 16px; border: none; border-radius: 8px; cursor: pointer; background: #e9e4dc; }
+  button.main { background: var(--main); color: #fff; font-weight: bold; }
+  .err { color: var(--warn); font-weight: bold; }
+  .warn { background: #fdecea; color: var(--warn); border-radius: 8px; padding: 10px; }
+  #qr { text-align: center; }
+  #qr svg { width: min(360px, 100%); height: auto; }
+  #url { word-break: break-all; font-size: 12px; color: var(--sub); }
+  @media (max-width: 520px) { .q { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>家族の問題 → QRコード</h1>
+  <p>ここに書いた問題をQRコードにします。ご両親がスマホのカメラで読むと、アプリに問題が追加されます。
+    問題はURLの <code>#</code> より後ろに入るので、サーバーには送られません。</p>
+
+  <div class="card">
+    <label for="appUrl">アプリのURL（GitHub Pages の公開先）</label>
+    <input id="appUrl" placeholder="https://ユーザー名.github.io/リポジトリ名/">
+  </div>
+
+  <div class="card">
+    <strong>問題</strong>
+    <div id="rows"></div>
+    <p><button id="addRow">＋ 問題をふやす</button></p>
+  </div>
+
+  <p><button class="main" id="make">QRコードを作る</button></p>
+  <p class="err" id="err"></p>
+
+  <div class="card" id="out" hidden>
+    <p class="warn">このQRコードには孫の学校名などの個人情報が入っています。SNSやグループLINEには載せないでください。</p>
+    <div id="qr"></div>
+    <p id="url"></p>
+  </div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script src="common.js"></script>
+<script>
+  const DRAFT = 'oyaQuiz.qrDraft';
+  const $ = id => document.getElementById(id);
+
+  const EXAMPLES = [
+    { q: '孫1の小学校は？', kana: '', display: '', hint: '' },
+    { q: '孫1が通っていた保育園は？', kana: '', display: '', hint: '' },
+    { q: '孫2の小学校は？', kana: '', display: '', hint: '' },
+    { q: '孫2が通っていた幼稚園は？', kana: '', display: '', hint: '' },
+    { q: '孫3の幼稚園は？', kana: '', display: '', hint: '' },
+  ];
+
+  function field(row, key, label, ph, wide) {
+    const wrap = document.createElement('div');
+    if (wide) wrap.className = 'wide';
+    const l = document.createElement('label');
+    l.textContent = label;
+    const i = document.createElement('input');
+    i.value = row[key] || '';
+    i.placeholder = ph;
+    i.dataset.key = key;
+    i.oninput = saveDraft;
+    l.appendChild(i);
+    wrap.appendChild(l);
+    return wrap;
+  }
+
+  function addRow(row) {
+    const d = document.createElement('div');
+    d.className = 'q';
+    d.append(
+      field(row, 'q', '問題文', '例：孫1の小学校は？', true),
+      field(row, 'kana', 'こたえ（ひらがな）', '例：さくらがおかしょうがっこう'),
+      field(row, 'display', '正解で見せる表記（空なら ひらがな）', '例：桜丘小学校'),
+      field(row, 'hint', '小さな手がかり（任意）', '例：家から歩いて10分', true),
+    );
+    const tools = document.createElement('div');
+    tools.className = 'tools';
+    const del = document.createElement('button');
+    del.textContent = 'この問題をけす';
+    del.onclick = () => { d.remove(); saveDraft(); };
+    tools.appendChild(del);
+    d.appendChild(tools);
+    $('rows').appendChild(d);
+  }
+
+  function readRows() {
+    return Array.from(document.querySelectorAll('#rows .q')).map(d => {
+      const r = {};
+      d.querySelectorAll('input').forEach(i => { r[i.dataset.key] = i.value.trim(); });
+      return r;
+    });
+  }
+
+  function saveDraft() {
+    saveJSON(DRAFT, { url: $('appUrl').value.trim(), rows: readRows() });
+  }
+
+  function make() {
+    $('err').textContent = '';
+    $('out').hidden = true;
+    let base = $('appUrl').value.trim();
+    if (!/^https?:\/\//.test(base)) {
+      $('err').textContent = 'アプリのURLを https:// から入れてください。';
+      return;
+    }
+    base = base.split('#')[0];
+    const rows = readRows().filter(r => r.q || r.kana);
+    if (!rows.length) {
+      $('err').textContent = '問題が1つもありません。';
+      return;
+    }
+    for (const r of rows) {
+      if (!r.q || !r.kana) {
+        $('err').textContent = `問題文とこたえの両方を入れてください（「${r.q || r.kana}」）。`;
+        return;
+      }
+      const n = normalizeAnswer(r.kana);
+      if (!/^[ぁ-ゖー]+$/.test(n)) {
+        $('err').textContent = `こたえは ひらがな だけで入れてください（「${r.kana}」）。`;
+        return;
+      }
+      if (Array.from(n).length < 2) {
+        $('err').textContent = `こたえは2文字以上にしてください（「${r.kana}」）。`;
+        return;
+      }
+    }
+    const url = base + '#add=' + encodeFamily(rows);
+    let qr;
+    try {
+      qr = qrcode(0, 'L');
+      qr.addData(url);
+      qr.make();
+    } catch (e) {
+      $('err').textContent = '問題が多すぎてQRコードに入りません。2回に分けて作ってください。';
+      return;
+    }
+    $('qr').innerHTML = qr.createSvgTag({ cellSize: 6, margin: 4, scalable: true });
+    $('url').textContent = url;
+    $('out').hidden = false;
+    $('out').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  const draft = loadJSON(DRAFT, null);
+  $('appUrl').value = draft && draft.url ? draft.url : '';
+  (draft && draft.rows && draft.rows.length ? draft.rows : EXAMPLES).forEach(addRow);
+  $('appUrl').oninput = saveDraft;
+  $('addRow').onclick = () => { addRow({}); saveDraft(); };
+  $('make').onclick = make;
+</script>
+</body>
+</html>
